@@ -17,6 +17,8 @@ import tempfile
 import wave
 import json
 import requests
+import speech_recognition as sr
+
 try:
     from json.decoder import JSONDecodeError
 except ImportError:
@@ -51,9 +53,9 @@ def percentile(arr, percent):
     return low_value + high_value
 
 
-class FLACConverter(object): # pylint: disable=too-few-public-methods
+class WAVConverter(object): # pylint: disable=too-few-public-methods
     """
-    Class for converting a region of an input audio or video file into a FLAC audio file
+    Class for converting a region of an input audio or video file into a WAV audio file
     """
     def __init__(self, source_path, include_before=0.25, include_after=0.25):
         self.source_path = source_path
@@ -65,16 +67,13 @@ class FLACConverter(object): # pylint: disable=too-few-public-methods
             start, end = region
             start = max(0, start - self.include_before)
             end += self.include_after
-            temp = tempfile.NamedTemporaryFile(suffix='.flac', delete=False)
+            temp = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
             command = ["ffmpeg", "-ss", str(start), "-t", str(end - start),
                        "-y", "-i", self.source_path,
                        "-loglevel", "error", temp.name]
             use_shell = True if os.name == "nt" else False
             subprocess.check_output(command, stdin=open(os.devnull), shell=use_shell)
-            read_data = temp.read()
-            temp.close()
-            os.unlink(temp.name)
-            return read_data
+            return temp.name
 
         except KeyboardInterrupt:
             return None
@@ -82,36 +81,28 @@ class FLACConverter(object): # pylint: disable=too-few-public-methods
 
 class SpeechRecognizer(object): # pylint: disable=too-few-public-methods
     """
-    Class for performing speech-to-text for an input FLAC file.
+    Class for performing speech-to-text for an input WAV file.
     """
-    def __init__(self, language="en", rate=44100, retries=3, api_key=GOOGLE_SPEECH_API_KEY):
+    def __init__(self, language="pt", retries=3, api_witai=None):
         self.language = language
-        self.rate = rate
-        self.api_key = api_key
+        self.api_witai = api_witai
         self.retries = retries
 
     def __call__(self, data):
         try:
             for _ in range(self.retries):
-                url = GOOGLE_SPEECH_API_URL.format(lang=self.language, key=self.api_key)
-                headers = {"Content-Type": "audio/x-flac; rate=%d" % self.rate}
-
+                r = sr.Recognizer()
+                with sr.AudioFile(data) as source:
+                    audio = r.record(source)
                 try:
-                    resp = requests.post(url, data=data, headers=headers)
-                except requests.exceptions.ConnectionError:
+                    if self.api_witai:
+                        return r.recognize_wit(audio, key=self.api_witai)
+                    else:
+                        return r.recognize_google(audio, language=self.language)
+                except sr.UnknownValueError:
                     continue
-
-                for line in resp.content.decode('utf-8').split("\n"):
-                    try:
-                        line = json.loads(line)
-                        line = line['result'][0]['alternative'][0]['transcript']
-                        return line[:1].upper() + line[1:]
-                    except IndexError:
-                        # no result
-                        continue
-                    except JSONDecodeError:
-                        continue
-
+                except sr.RequestError as e:
+                    continue
         except KeyboardInterrupt:
             return None
 
@@ -238,6 +229,7 @@ def generate_subtitles( # pylint: disable=too-many-locals,too-many-arguments
         dst_language=DEFAULT_DST_LANGUAGE,
         subtitle_file_format=DEFAULT_SUBTITLE_FORMAT,
         api_key=None,
+        api_witai=None,
     ):
     """
     Given an input audio/video file, generate subtitles in the specified language and format.
@@ -247,14 +239,13 @@ def generate_subtitles( # pylint: disable=too-many-locals,too-many-arguments
     regions = find_speech_regions(audio_filename)
 
     pool = multiprocessing.Pool(concurrency)
-    converter = FLACConverter(source_path=audio_filename)
-    recognizer = SpeechRecognizer(language=src_language, rate=audio_rate,
-                                  api_key=GOOGLE_SPEECH_API_KEY)
+    converter = WAVConverter(source_path=audio_filename)
+    recognizer = SpeechRecognizer(language=src_language, api_witai=api_witai)
 
     transcripts = []
     if regions:
         try:
-            widgets = ["Converting speech regions to FLAC files: ", Percentage(), ' ', Bar(), ' ',
+            widgets = ["Converting speech regions to WAV files: ", Percentage(), ' ', Bar(), ' ',
                        ETA()]
             pbar = ProgressBar(widgets=widgets, maxval=len(regions)).start()
             extracted_regions = []
@@ -362,6 +353,9 @@ def main():
     parser.add_argument('-o', '--output',
                         help="Output path for subtitles (by default, subtitles are saved in \
                         the same directory and name as the source path)")
+    parser.add_argument('-W', '--api-witai',
+                        help="The Wit.AI API key to be used. \
+                        (Required for best transcriptions)")
     parser.add_argument('-F', '--format', help="Destination subtitle format",
                         default=DEFAULT_SUBTITLE_FORMAT)
     parser.add_argument('-S', '--src-language', help="Language spoken in source file",
@@ -400,6 +394,7 @@ def main():
             src_language=args.src_language,
             dst_language=args.dst_language,
             api_key=args.api_key,
+            api_witai=args.api_witai,
             subtitle_file_format=args.format,
             output=args.output,
         )
