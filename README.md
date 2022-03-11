@@ -1,4 +1,4 @@
-# Autosub <a href="https://pypi.python.org/pypi/autosub"><img src="https://img.shields.io/pypi/v/autosub.svg"></img></a>
+# Autosub <a href="https://pypi.python.org/pypi/autosubmaia"><img src="https://img.shields.io/pypi/v/autosubmaia.svg"></img></a>
   
 ### Auto-generated subtitles for any video
 * Removed request via request for Google Web Speech API.
