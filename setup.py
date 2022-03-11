@@ -9,7 +9,7 @@ except ImportError:
 long_description = (
     'Autosub is a utility for automatic speech recognition and subtitle generation. '
     'It takes a video or an audio file as input, performs voice activity detection '
-    'to find speech regions, makes parallel requests to Google Web Speech API to '
+    'to find speech regions, makes parallel requests to Speech Recognition API to '
     'generate transcriptions for those regions, (optionally) translates them to a '
     'different language, and finally saves the resulting subtitles to disk. '
     'It supports a variety of input and output languages (to see which, run the '
@@ -19,13 +19,13 @@ long_description = (
 )
 
 setup(
-    name='autosub',
-    version='0.4.0',
-    description='Auto-generates subtitles for any video or audio file',
+    name='autosubmaia',
+    version='0.0.1',
+    description='Auto-generates subtitles for any video or audio file with support to wit.ai and speech recognition module.',
     long_description=long_description,
-    author='Anastasis Germanidis',
-    author_email='agermanidis@gmail.com',
-    url='https://github.com/agermanidis/autosub',
+    author='Lucas Maia',
+    author_email='lucasmaia.contato@icloud.com',
+    url='https://github.com/Iucasmaia/autosub',
     packages=['autosub'],
     entry_points={
         'console_scripts': [
@@ -38,6 +38,7 @@ setup(
         'pysrt>=1.0.1',
         'progressbar2>=3.34.3',
         'six>=1.11.0',
+        'SpeechRecognition>=3.8.1',
     ],
     license=open("LICENSE").read()
 )
