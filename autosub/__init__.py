@@ -18,6 +18,7 @@ import wave
 import json
 import requests
 import speech_recognition as sr
+import html
 
 try:
     from json.decoder import JSONDecodeError
@@ -273,7 +274,10 @@ def generate_subtitles( # pylint: disable=too-many-locals,too-many-arguments
                     pbar = ProgressBar(widgets=widgets, maxval=len(regions)).start()
                     translated_transcripts = []
                     for i, transcript in enumerate(pool.imap(translator, transcripts)):
-                        translated_transcripts.append(transcript)
+                        if transcript != None:
+                            translated_transcripts.append(html.unescape(transcript))
+                        else:
+                            translated_transcripts.append(transcript)
                         pbar.update(i)
                     pbar.finish()
                     transcripts = translated_transcripts
